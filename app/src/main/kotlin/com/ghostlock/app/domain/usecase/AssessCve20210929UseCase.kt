@@ -2,7 +2,8 @@ package com.ghostlock.app.domain.usecase
 
 import com.ghostlock.app.domain.model.Cve20210929Assessment
 import com.ghostlock.app.domain.model.Cve20210929Status
-import com.ghostlock.app.domain.model.IonDeviceSignal
+import com.ghostlock.app.domain.model.IonDeviceProbe
+import com.ghostlock.app.domain.model.IonProbePathStatus
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -14,18 +15,18 @@ internal object AssessCve20210929UseCase {
     private const val FixSecurityPatchLevel = "2021-11-05"
     private const val PatchLevelPattern = "yyyy-MM-dd"
 
-    fun assess(securityPatchLevel: String?, ionDeviceSignal: IonDeviceSignal): Cve20210929Assessment {
+    fun assess(securityPatchLevel: String?, ionProbe: IonDeviceProbe): Cve20210929Assessment {
         val patchLevel = securityPatchLevel?.takeIf(::isValidPatchLevel)
         val status = when {
             patchLevel == null -> Cve20210929Status.UNKNOWN
             patchLevel >= FixSecurityPatchLevel -> Cve20210929Status.VENDOR_REPORTED_PATCHED
-            ionDeviceSignal == IonDeviceSignal.PRESENT -> Cve20210929Status.POTENTIALLY_AFFECTED
+            ionProbe.path == IonProbePathStatus.PRESENT -> Cve20210929Status.POTENTIALLY_AFFECTED
             else -> Cve20210929Status.UNKNOWN
         }
         return Cve20210929Assessment(
             status = status,
             securityPatchLevel = securityPatchLevel?.takeIf(String::isNotBlank),
-            ionDeviceSignal = ionDeviceSignal,
+            ionProbe = ionProbe,
         )
     }
 

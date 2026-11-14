@@ -14,6 +14,7 @@
 
 #include "profile/entry.h"
 #include "support/fatal_error.hpp"
+#include "support/ion_probe.hpp"
 #include "support/run_state.hpp"
 #include "route/orchestrator.hpp"
 
@@ -26,6 +27,9 @@ using namespace ghostlock;
 
 
 int main(int argc, char **argv) {
+    if (argc == 2 && std::string_view(argv[1]) == "--probe-ion") {
+        return support::ion_probe::run_cli();
+    }
     try {
         profile::kernel_offsets decoded = {};
         std::array<char, 256> release_buf{};
@@ -52,7 +56,7 @@ int main(int argc, char **argv) {
             } else if (std::string_view(argv[i]) == "--dump-kernel-log" && i + 1 < argc) {
                 dump_dir = argv[++i];
             } else {
-                pr_error("usage: %s [--ghostlock-app-call | --load-prebuilt-profile <bin>]"
+                pr_error("usage: %s [--ghostlock-app-call | --load-prebuilt-profile <bin> | --probe-ion]"
                 " [--dump-kernel-log <dir>] [--force-attack] [--enable-status-record]\n", argv[0]);
                 return 1;
             }

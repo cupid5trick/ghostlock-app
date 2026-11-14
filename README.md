@@ -14,7 +14,7 @@ Support requires an exact `uname -r` match. Check the [supported devices](docs/k
 
 If Shizuku is enabled, start it with ADB before running GhostLock. Tap GhostLock's status card to grant access.
 
-The home screen also shows a read-only CVE-2021-0929 assessment. It uses Android's reported security patch level and whether an ION device interface is detectable. A patch level of `2021-11-05` or later is shown as **Vendor reports patched**; an earlier level with a detected ION interface is shown as **Potentially affected**. Missing or inconclusive signals show **Unknown**. These indicators do not verify the running kernel's code or vendor backports.
+The home screen also shows a read-only CVE-2021-0929 assessment. It uses Android's reported security patch level and probes `/dev/ion` in order: node presence, read permission, read-only open, then `ION_IOC_HEAP_QUERY` for the heap count. The ioctl does not allocate an ION buffer. A patch level of `2021-11-05` or later is shown as **Vendor reports patched**; an earlier level with a detected ION node is shown as **Potentially affected**. Missing or inconclusive signals show **Unknown**. Probe success only confirms that the interface answered a metadata query; it does not verify the running kernel's code, vulnerability, or vendor backports.
 
 Any root manager that ships `libksud.so` provides `ksud` for module loading. The built-in list (KernelSU, SukiSU Ultra, ReSukiSU, BakaSU, KowSU) is auto-detected, and other managers can be picked in **Settings → Root manager**. Without `ksud`, W1/W2 still grant uid 0 but no module is loaded.
 

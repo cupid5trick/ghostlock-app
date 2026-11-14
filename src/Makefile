@@ -42,6 +42,7 @@ CXX_SRCS := \
   core/session/handoff_probe.cpp \
   core/session/victim_process.cpp \
   core/session/victim_context.cpp \
+  core/support/ion_probe.cpp \
   core/support/native_resource.cpp \
   core/support/run_state.cpp
 
@@ -121,7 +122,7 @@ NATIVE_HOST_TESTS := \
   target_constants_test native_resource_test \
   profile_binary_test futex_hash_test number_parse_test \
   runtime_paths_test handoff_probe_test victim_context_test \
-  run_state_test address_space_test cpp_link_probe_test
+  run_state_test address_space_test cpp_link_probe_test ion_probe_test
 
 native-host-tests: $(addprefix $(HOST_BUILD_DIR)/,$(NATIVE_HOST_TESTS))
 	@status=0; for test in $^; do $$test || status=1; done; exit $$status
@@ -194,6 +195,10 @@ $(HOST_BUILD_DIR)/native_resource_test: core/tests/native_resource_test.cpp core
 $(HOST_BUILD_DIR)/run_state_test: core/tests/run_state_test.cpp core/support/run_state.cpp core/support/run_state.hpp
 	@mkdir -p $(HOST_BUILD_DIR)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -Icore core/tests/run_state_test.cpp core/support/run_state.cpp -o $@
+
+$(HOST_BUILD_DIR)/ion_probe_test: core/tests/ion_probe_test.cpp core/support/ion_probe.cpp core/support/ion_probe.hpp
+	@mkdir -p $(HOST_BUILD_DIR)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Icore core/tests/ion_probe_test.cpp core/support/ion_probe.cpp -o $@
 
 $(HOST_BUILD_DIR)/address_space_test: core/tests/address_space_test.cpp core/memory/address_space.cpp core/memory/address_space.h core/profile/model.h
 	@mkdir -p $(HOST_BUILD_DIR)
