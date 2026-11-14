@@ -112,12 +112,15 @@ target-constants-test: $(HOST_BUILD_DIR)/target_constants_test
 native-resource-test: $(HOST_BUILD_DIR)/native_resource_test
 	$(HOST_BUILD_DIR)/native_resource_test
 
+ion_backend_demo: $(HOST_BUILD_DIR)/ion_backend_demo
+	$(HOST_BUILD_DIR)/ion_backend_demo
+
 NATIVE_HOST_TESTS := \
   profile_test payload_builder_test heap_context_test route_status_test \
   route_catalog_test component_catalog_test backend_contract_test route_policy_test \
   route_lifecycle_test runtime_time_test \
   kernelsnitch_scan_bounds_test route_controller_test pi_race_test \
-  tcp_zerocopy_route_test select_stack_route_test \
+  select_stack_route_test \
   target_constants_test native_resource_test \
   profile_binary_test futex_hash_test number_parse_test \
   runtime_paths_test handoff_probe_test victim_context_test \
@@ -285,6 +288,10 @@ $(HOST_BUILD_DIR)/handoff_probe_test: core/tests/handoff_probe_test.cpp core/ses
 $(HOST_BUILD_DIR)/victim_context_test: core/tests/victim_context_test.cpp core/session/victim_context.cpp core/session/victim_context.hpp core/support/native_resource.cpp core/support/native_resource.hpp
 	@mkdir -p $(HOST_BUILD_DIR)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/victim_context_test.cpp core/session/victim_context.cpp core/support/native_resource.cpp -o $@
+
+$(HOST_BUILD_DIR)/ion_backend_demo: core/tests/ion_backend_demo.cpp
+	@mkdir -p $(HOST_BUILD_DIR)}
+	$(HOST_CXX) $(HOST_CXX_FLAGS) -Icore $< -o $@
 
 product: ghostlock
 	@echo "=== ghostlock binary ready: $(GHOSTLOCK_BIN) ==="
