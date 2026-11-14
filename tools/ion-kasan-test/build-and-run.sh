@@ -118,8 +118,17 @@ run_guest() {
 }
 
 build_kernel baseline "$source_dir"
-run_guest baseline
 build_kernel fixed "$fixed_dir"
+baseline_config_hash=$(sha256sum "$build_root/baseline/.config" | cut -d' ' -f1)
+fixed_config_hash=$(sha256sum "$build_root/fixed/.config" | cut -d' ' -f1)
+if [[ "$baseline_config_hash" != "$fixed_config_hash" ]]; then
+	echo "FAIL: baseline and fixed kernel configs differ" >&2
+	echo "baseline config=$baseline_config_hash" >&2
+	echo "fixed config=$fixed_config_hash" >&2
+	exit 1
+fi
+echo "CONFIGS_MATCH sha256=$baseline_config_hash"
+run_guest baseline
 run_guest fixed
 
 baseline_log="$build_root/baseline-qemu.log"
