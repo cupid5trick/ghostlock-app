@@ -1,0 +1,41 @@
+name: ION v4.14.116 KASAN regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ion-kasan-regression.yml"
+      - "build-core.sh"
+      - "src/Makefile"
+      - "src/core/tests/ion_backend_demo.cpp"
+      - "tools/ion-kasan-test/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qemu-ion-kasan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU and AArch64 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential cpio flex gcc-aarch64-linux-gnu +            libssl-dev qemu-system-arm
+      - name: Compare upstream and fixed-control kernels in QEMU
+        env:
+          ION_KASAN_BUILD_DIR: ${{ runner.temp }}/ion-kasan
+          JOBS: "2"
+        run: make -C src ion-kasan-regression
+      - name: Upload kernel configs and guest logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ion-v4.14.116-qemu-kasan-evidence
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/ion-kasan/baseline/.config
+            ${{ runner.temp }}/ion-kasan/fixed/.config
+            ${{ runner.temp }}/ion-kasan/baseline-qemu.log
+            ${{ runner.temp }}/ion-kasan/fixed-qemu.log

