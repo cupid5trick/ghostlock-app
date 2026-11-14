@@ -67,6 +67,17 @@
     <string name="device_label">设备</string>
     <string name="kernel_label">内核</string>
     <string name="soc_label">芯片</string>
+    <string name="cve_2021_0929_assessment_label">CVE-2021-0929 评估</string>
+    <string name="cve_2021_0929_vendor_patched">厂商报告已修复</string>
+    <string name="cve_2021_0929_potentially_affected">可能受影响</string>
+    <string name="cve_2021_0929_unknown">未知</string>
+    <string name="cve_2021_0929_vendor_patched_summary">报告的安全补丁级别：%1$s。此信息无法验证当前运行内核中的补丁。</string>
+    <string name="cve_2021_0929_potentially_affected_summary">报告的补丁级别 %1$s 早于修复版本，并检测到 ION 接口。这不能证明漏洞可被利用。</string>
+    <string name="cve_2021_0929_unknown_summary">报告的安全补丁级别：%1$s。ION 接口：%2$s。未检测到或无法访问 ION 信息，并不能证明内核不受影响。</string>
+    <string name="cve_security_patch_unavailable">不可用</string>
+    <string name="cve_ion_detected">已检测到</string>
+    <string name="cve_ion_not_detected">未检测到</string>
+    <string name="cve_ion_unavailable">无法检测</string>
     <string name="kernel_supported">受支持</string>
     <string name="kernel_unsupported">不支持</string>
     <string name="kernel_profile_required">需要加载配置</string>

@@ -61,6 +61,9 @@ import androidx.compose.ui.unit.sp
 import com.ghostlock.app.R
 import com.ghostlock.app.data.ManagerScanner
 import com.ghostlock.app.domain.model.CpuPair
+import com.ghostlock.app.domain.model.Cve20210929Assessment
+import com.ghostlock.app.domain.model.Cve20210929Status
+import com.ghostlock.app.domain.model.IonDeviceSignal
 import com.ghostlock.app.domain.model.ExecutionFieldValue
 import com.ghostlock.app.domain.model.ProfileFieldNode
 import com.ghostlock.app.domain.model.ShizukuStatus
@@ -107,6 +110,11 @@ data class GhostlockUiState(
     val kernelRelease: String = "",
     val socName: String = "",
     val kernelSupported: Boolean = false,
+    val cve20210929Assessment: Cve20210929Assessment = Cve20210929Assessment(
+        status = Cve20210929Status.UNKNOWN,
+        securityPatchLevel = null,
+        ionDeviceSignal = IonDeviceSignal.UNKNOWN,
+    ),
     val shizukuEnabled: Boolean = false,
     val shizukuStatus: ShizukuStatus = ShizukuStatus.NOT_REQUIRED,
     val running: Boolean = false,
@@ -842,6 +850,7 @@ private fun ControlPanel(
             deviceName = state.deviceName,
             socName = state.socName,
             kernelRelease = state.kernelRelease,
+            cve20210929Assessment = state.cve20210929Assessment,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
@@ -1025,6 +1034,7 @@ private fun DeviceInfoCard(
     deviceName: String,
     socName: String,
     kernelRelease: String,
+    cve20210929Assessment: Cve20210929Assessment,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -1048,8 +1058,70 @@ private fun DeviceInfoCard(
                     title = stringResource(R.string.kernel_label),
                     value = kernelRelease,
                 )
+                Cve20210929AssessmentItem(assessment = cve20210929Assessment)
             }
         }
+    }
+}
+
+@Composable
+private fun Cve20210929AssessmentItem(assessment: Cve20210929Assessment) {
+    val status = when (assessment.status) {
+        Cve20210929Status.VENDOR_REPORTED_PATCHED ->
+            R.string.cve_2021_0929_vendor_patched
+
+        Cve20210929Status.POTENTIALLY_AFFECTED ->
+            R.string.cve_2021_0929_potentially_affected
+
+        Cve20210929Status.UNKNOWN -> R.string.cve_2021_0929_unknown
+    }
+    val patchLevel = assessment.securityPatchLevel
+        ?.takeIf(String::isNotBlank)
+        ?: stringResource(R.string.cve_security_patch_unavailable)
+    val ionStatus = stringResource(
+        when (assessment.ionDeviceSignal) {
+            IonDeviceSignal.PRESENT -> R.string.cve_ion_detected
+            IonDeviceSignal.ABSENT -> R.string.cve_ion_not_detected
+            IonDeviceSignal.UNKNOWN -> R.string.cve_ion_unavailable
+        },
+    )
+    val summary = when (assessment.status) {
+        Cve20210929Status.VENDOR_REPORTED_PATCHED -> stringResource(
+            R.string.cve_2021_0929_vendor_patched_summary,
+            patchLevel,
+        )
+
+        Cve20210929Status.POTENTIALLY_AFFECTED -> stringResource(
+            R.string.cve_2021_0929_potentially_affected_summary,
+            patchLevel,
+        )
+
+        Cve20210929Status.UNKNOWN -> stringResource(
+            R.string.cve_2021_0929_unknown_summary,
+            patchLevel,
+            ionStatus,
+        )
+    }
+    Column {
+        Text(
+            text = stringResource(R.string.cve_2021_0929_assessment_label),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(status),
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = summary,
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+        )
     }
 }
 

@@ -20,7 +20,23 @@ data class KernelSnapshot(
     /** User-selected Shizuku path for kernels that do not require it. */
     val shizukuEnabled: Boolean = false,
     val shizukuStatus: ShizukuStatus,
+    val cve20210929Assessment: Cve20210929Assessment,
 )
+
+/** Read-only indicators for CVE-2021-0929; this does not inspect kernel code. */
+data class Cve20210929Assessment(
+    val status: Cve20210929Status,
+    val securityPatchLevel: String?,
+    val ionDeviceSignal: IonDeviceSignal,
+)
+
+enum class Cve20210929Status {
+    VENDOR_REPORTED_PATCHED,
+    POTENTIALLY_AFFECTED,
+    UNKNOWN,
+}
+
+enum class IonDeviceSignal { PRESENT, ABSENT, UNKNOWN }
 
 enum class ShizukuStatus { NOT_REQUIRED, NOT_RUNNING, PERMISSION_REQUIRED, READY }
 

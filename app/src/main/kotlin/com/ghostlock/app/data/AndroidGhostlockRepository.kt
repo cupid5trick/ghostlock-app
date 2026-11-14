@@ -19,7 +19,9 @@ import com.ghostlock.app.domain.model.OffsetImportResult
 import com.ghostlock.app.domain.model.ParseResult
 import com.ghostlock.app.domain.model.ProfileConfig
 import com.ghostlock.app.domain.model.UserProfileFile
+import com.ghostlock.app.domain.model.IonDeviceSignal
 import com.ghostlock.app.domain.repository.GhostlockRepository
+import com.ghostlock.app.domain.usecase.AssessCve20210929UseCase
 import com.ghostlock.app.domain.repository.ProfileConfigController
 import com.ghostlock.app.shizuku.ShizukuExploitRunner
 import kotlinx.coroutines.CancellationException
@@ -159,6 +161,10 @@ class AndroidGhostlockRepository(context: Context) : GhostlockRepository {
         return KernelSnapshot(
             deviceName = resolveDeviceName(),
             kernelRelease = release,
+            cve20210929Assessment = AssessCve20210929UseCase.assess(
+                securityPatchLevel = Build.VERSION.SECURITY_PATCH,
+                ionDeviceSignal = detectIonDeviceSignal(),
+            ),
             socName = resolveSocName(),
             kernelSupported = isKernelSupported(),
             cpuPairs = cpuPairs.toList(),
@@ -172,6 +178,15 @@ class AndroidGhostlockRepository(context: Context) : GhostlockRepository {
             else com.ghostlock.app.domain.model.ShizukuStatus.NOT_REQUIRED,
         )
     }
+
+    /** A positive node check is useful evidence; absence can also mean hidden or inaccessible. */
+    private fun detectIonDeviceSignal(): IonDeviceSignal =
+        if (File("/dev/ion").exists() || File("/sys/class/misc/ion").exists()) {
+            IonDeviceSignal.PRESENT
+        } else {
+            // A failed existence check cannot distinguish absence from a hidden or inaccessible node.
+            IonDeviceSignal.UNKNOWN
+        }
 
     override fun selectCpuPair(index: Int) {
         if (index !in cpuPairs.indices) return

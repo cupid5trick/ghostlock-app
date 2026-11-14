@@ -1078,6 +1078,7 @@ class GhostlockViewModel(
             it.copy(
                 deviceName = snapshot.deviceName,
                 kernelRelease = snapshot.kernelRelease,
+                cve20210929Assessment = snapshot.cve20210929Assessment,
                 socName = snapshot.socName,
                 kernelSupported = snapshot.kernelSupported,
                 cpuPairLabels = snapshot.cpuPairLabels,
