@@ -30,6 +30,19 @@ Extractor output is an unverified candidate. The app checks missing or invalid f
 
 See the [MediaTek guide](docs/kernel_profiles/MEDIATEK.md) for image-based address recovery and the rooted-device fallback.
 
+## Build APKs
+
+Pull requests build a debug APK without signing secrets. A push or manual run on this fork's `main` builds a release APK signed with this fork's release certificate. Build one locally with the ignored `release-signing.env` and `release-signing.jks` files:
+
+```sh
+set -a
+. ./release-signing.env
+set +a
+./gradlew :app:assembleRelease
+```
+
+Do not commit either file. This fork uses its own signing certificate; its APK cannot update an installation signed by the upstream project's certificate.
+
 ## Command-line tools
 
 <details>

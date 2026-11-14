@@ -27,6 +27,17 @@ val gitVersionCode = runCatching {
 
 val buildInfoSrc = layout.buildDirectory.dir("generated/source/buildInfo")
 
+val signingProperties = Properties()
+runCatching { signingProperties.load(rootProject.file("local.properties").inputStream()) }
+val keystorePath = (signingProperties.getProperty("KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH"))
+    ?.trim()?.takeIf { it.isNotEmpty() }
+val keystorePwd = signingProperties.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
+val alias = signingProperties.getProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
+val pwd = signingProperties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+val keystoreFile = keystorePath?.let(::file)?.takeIf { it.isFile && it.length() > 0L }
+val hasReleaseSigning = keystoreFile != null &&
+    !keystorePwd.isNullOrBlank() && !alias.isNullOrBlank() && !pwd.isNullOrBlank()
+
 val generateBuildInfo = tasks.register("generateBuildInfo") {
     description = "generateBuildInfo"
     val outputDirectory = buildInfoSrc
@@ -81,14 +92,7 @@ android {
             kotlin.directories.add(buildInfoSrc.get().asFile.absolutePath)
         }
     }
-    val properties = Properties()
-    runCatching { properties.load(project.rootProject.file("local.properties").inputStream()) }
-    val keystorePath = (properties.getProperty("KEYSTORE_PATH") ?: System.getenv("KEYSTORE_PATH"))?.trim()?.takeIf { it.isNotEmpty() }
-    val keystorePwd = properties.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
-    val alias = properties.getProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
-    val pwd = properties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
-    val keystoreFile = keystorePath?.let(::file)?.takeIf { it.isFile && it.length() > 0L }
-    if (keystoreFile != null) {
+    if (hasReleaseSigning) {
         signingConfigs {
             create("release") {
                 storeFile = keystoreFile
@@ -105,10 +109,7 @@ android {
             optimization.enable = true
             vcsInfo.include = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName(if (keystoreFile != null) "release" else "debug")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName(if (keystoreFile != null) "release" else "debug")
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
     }
     buildFeatures {
@@ -194,4 +195,24 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
+}
+
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    group = "verification"
+    description = "Reject release APK builds without the configured release keystore and credentials."
+    inputs.property("releaseSigningConfigured", hasReleaseSigning)
+    doLast {
+        if (inputs.properties["releaseSigningConfigured"] != true) {
+            throw org.gradle.api.GradleException(
+                "Release signing is not configured. Source release-signing.env or provide KEYSTORE_PATH, " +
+                    "KEYSTORE_PASS, KEY_ALIAS, and KEY_PASSWORD.",
+            )
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease" || name == "packageRelease") {
+        dependsOn(verifyReleaseSigning)
+    }
 }

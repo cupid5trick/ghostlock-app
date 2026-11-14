@@ -1,5 +1,7 @@
 /ghostlock
 local.properties
+release-signing.env
+release-signing.jks
 .gradle/
 .idea/
 .kotlin/

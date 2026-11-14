@@ -30,6 +30,19 @@ GhostLock 利用 CVE-2026-43499 在支持的 Android 内核上获取临时 root�
 
 联发科的镜像地址提取和已 root 设备补充取值流程见[联发科指南](docs/kernel_profiles/MEDIATEK_ZH.md)。
 
+## 构建 APK
+
+Pull request 会在不使用签名密钥的情况下构建 debug APK。在此 fork 的 `main` 分支推送或手动运行工作流时，会使用此 fork 的发布证书构建 release APK。本地构建时 source 被 Git 忽略的 `release-signing.env` 和 `release-signing.jks`：
+
+```sh
+set -a
+. ./release-signing.env
+set +a
+./gradlew :app:assembleRelease
+```
+
+不要提交这两个文件。此 fork 使用独立的签名证书，因此它的 APK 不能覆盖由上游项目证书签名的安装包。
+
 ## 命令行工具
 
 <details>
