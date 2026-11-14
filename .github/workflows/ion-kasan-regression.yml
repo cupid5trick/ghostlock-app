@@ -22,7 +22,9 @@ jobs:
       - name: Install QEMU and AArch64 build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison build-essential cpio flex gcc-aarch64-linux-gnu +            libssl-dev qemu-system-arm
+          sudo apt-get install -y \
+            bc bison build-essential cpio flex gcc-aarch64-linux-gnu \
+            libssl-dev qemu-system-arm
       - name: Compare upstream and fixed-control kernels in QEMU
         env:
           ION_KASAN_BUILD_DIR: ${{ runner.temp }}/ion-kasan
