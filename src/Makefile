@@ -122,7 +122,7 @@ NATIVE_HOST_TESTS := \
   route_catalog_test component_catalog_test backend_contract_test route_policy_test \
   route_lifecycle_test runtime_time_test \
   kernelsnitch_scan_bounds_test route_controller_test pi_race_test \
-  select_stack_route_test \
+  tcp_zerocopy_route_test select_stack_route_test \
   target_constants_test native_resource_test \
   profile_binary_test futex_hash_test number_parse_test \
   runtime_paths_test handoff_probe_test victim_context_test \
