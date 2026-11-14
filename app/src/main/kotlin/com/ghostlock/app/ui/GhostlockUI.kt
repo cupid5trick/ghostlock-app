@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.annotation.StringRes
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -61,6 +62,13 @@ import androidx.compose.ui.unit.sp
 import com.ghostlock.app.R
 import com.ghostlock.app.data.ManagerScanner
 import com.ghostlock.app.domain.model.CpuPair
+import com.ghostlock.app.domain.model.Cve20210929Assessment
+import com.ghostlock.app.domain.model.Cve20210929Status
+import com.ghostlock.app.domain.model.IonDeviceProbe
+import com.ghostlock.app.domain.model.IonProbeIoctlStatus
+import com.ghostlock.app.domain.model.IonProbeOpenStatus
+import com.ghostlock.app.domain.model.IonProbePathStatus
+import com.ghostlock.app.domain.model.IonProbePermissionStatus
 import com.ghostlock.app.domain.model.ExecutionFieldValue
 import com.ghostlock.app.domain.model.ProfileFieldNode
 import com.ghostlock.app.domain.model.ShizukuStatus
@@ -107,6 +115,11 @@ data class GhostlockUiState(
     val kernelRelease: String = "",
     val socName: String = "",
     val kernelSupported: Boolean = false,
+    val cve20210929Assessment: Cve20210929Assessment = Cve20210929Assessment(
+        status = Cve20210929Status.UNKNOWN,
+        securityPatchLevel = null,
+        ionProbe = IonDeviceProbe(),
+    ),
     val shizukuEnabled: Boolean = false,
     val shizukuStatus: ShizukuStatus = ShizukuStatus.NOT_REQUIRED,
     val running: Boolean = false,
@@ -842,6 +855,7 @@ private fun ControlPanel(
             deviceName = state.deviceName,
             socName = state.socName,
             kernelRelease = state.kernelRelease,
+            cve20210929Assessment = state.cve20210929Assessment,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
@@ -1025,6 +1039,7 @@ private fun DeviceInfoCard(
     deviceName: String,
     socName: String,
     kernelRelease: String,
+    cve20210929Assessment: Cve20210929Assessment,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -1048,9 +1063,130 @@ private fun DeviceInfoCard(
                     title = stringResource(R.string.kernel_label),
                     value = kernelRelease,
                 )
+                Cve20210929AssessmentItem(assessment = cve20210929Assessment)
             }
         }
     }
+}
+
+@Composable
+private fun Cve20210929AssessmentItem(assessment: Cve20210929Assessment) {
+    val status = when (assessment.status) {
+        Cve20210929Status.VENDOR_REPORTED_PATCHED ->
+            R.string.cve_2021_0929_vendor_patched
+
+        Cve20210929Status.POTENTIALLY_AFFECTED ->
+            R.string.cve_2021_0929_potentially_affected
+
+        Cve20210929Status.UNKNOWN -> R.string.cve_2021_0929_unknown
+    }
+    val patchLevel = assessment.securityPatchLevel
+        ?.takeIf(String::isNotBlank)
+        ?: stringResource(R.string.cve_security_patch_unavailable)
+    val ionStatus = stringResource(
+        when (assessment.ionProbe.path) {
+            IonProbePathStatus.PRESENT -> R.string.cve_ion_detected
+            IonProbePathStatus.ABSENT -> R.string.cve_ion_not_detected
+            IonProbePathStatus.UNKNOWN -> R.string.cve_ion_unavailable
+        },
+    )
+    val summary = when (assessment.status) {
+        Cve20210929Status.VENDOR_REPORTED_PATCHED -> stringResource(
+            R.string.cve_2021_0929_vendor_patched_summary,
+            patchLevel,
+        )
+
+        Cve20210929Status.POTENTIALLY_AFFECTED -> stringResource(
+            R.string.cve_2021_0929_potentially_affected_summary,
+            patchLevel,
+        )
+
+        Cve20210929Status.UNKNOWN -> stringResource(
+            R.string.cve_2021_0929_unknown_summary,
+            patchLevel,
+            ionStatus,
+        )
+    }
+    Column {
+        Text(
+            text = stringResource(R.string.cve_2021_0929_assessment_label),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(status),
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = summary,
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+        )
+        Text(
+            text = stringResource(R.string.cve_ion_probe_heading),
+            modifier = Modifier.padding(top = 8.dp),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DeviceInfoItem(
+                title = stringResource(R.string.cve_ion_probe_path),
+                value = stringResource(ionPathLabel(assessment.ionProbe.path)),
+            )
+            DeviceInfoItem(
+                title = stringResource(R.string.cve_ion_probe_permission),
+                value = stringResource(ionPermissionLabel(assessment.ionProbe.readPermission)),
+            )
+            DeviceInfoItem(
+                title = stringResource(R.string.cve_ion_probe_open),
+                value = stringResource(ionOpenLabel(assessment.ionProbe.open)),
+            )
+            val ioctlLabel = when (assessment.ionProbe.heapQuery) {
+                IonProbeIoctlStatus.SUPPORTED -> stringResource(
+                    R.string.cve_ion_probe_ioctl_supported,
+                    assessment.ionProbe.heapCount ?: 0,
+                )
+
+                IonProbeIoctlStatus.UNSUPPORTED -> stringResource(R.string.cve_ion_probe_ioctl_unsupported)
+                IonProbeIoctlStatus.DENIED -> stringResource(R.string.cve_ion_probe_denied)
+                IonProbeIoctlStatus.FAILED -> stringResource(R.string.cve_ion_probe_failed)
+                IonProbeIoctlStatus.NOT_TESTED -> stringResource(R.string.cve_ion_probe_not_tested)
+            }
+            DeviceInfoItem(
+                title = stringResource(R.string.cve_ion_probe_ioctl),
+                value = ioctlLabel,
+            )
+        }
+    }
+}
+
+@StringRes
+private fun ionPathLabel(status: IonProbePathStatus): Int = when (status) {
+    IonProbePathStatus.PRESENT -> R.string.cve_ion_detected
+    IonProbePathStatus.ABSENT -> R.string.cve_ion_not_detected
+    IonProbePathStatus.UNKNOWN -> R.string.cve_ion_unavailable
+}
+
+@StringRes
+private fun ionPermissionLabel(status: IonProbePermissionStatus): Int = when (status) {
+    IonProbePermissionStatus.ALLOWED -> R.string.cve_ion_probe_allowed
+    IonProbePermissionStatus.DENIED -> R.string.cve_ion_probe_denied
+    IonProbePermissionStatus.UNKNOWN -> R.string.cve_ion_probe_unknown
+    IonProbePermissionStatus.NOT_TESTED -> R.string.cve_ion_probe_not_tested
+}
+
+@StringRes
+private fun ionOpenLabel(status: IonProbeOpenStatus): Int = when (status) {
+    IonProbeOpenStatus.OPENED -> R.string.cve_ion_probe_opened
+    IonProbeOpenStatus.DENIED -> R.string.cve_ion_probe_denied
+    IonProbeOpenStatus.FAILED -> R.string.cve_ion_probe_failed
+    IonProbeOpenStatus.NOT_TESTED -> R.string.cve_ion_probe_not_tested
 }
 
 @Composable

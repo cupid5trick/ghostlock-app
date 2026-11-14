@@ -13,6 +13,7 @@ import com.ghostlock.app.data.ManagerScanner
 import com.ghostlock.app.domain.model.CpuPair
 import com.ghostlock.app.domain.model.DebugSettings
 import com.ghostlock.app.domain.model.KernelSnapshot
+import com.ghostlock.app.domain.model.IonDeviceProbe
 import com.ghostlock.app.domain.model.OffsetCandidate
 import com.ghostlock.app.data.ota.OtaPayloadExtractor
 import com.ghostlock.app.domain.model.OffsetImportResult
@@ -20,6 +21,8 @@ import com.ghostlock.app.domain.model.ParseResult
 import com.ghostlock.app.domain.model.ProfileConfig
 import com.ghostlock.app.domain.model.UserProfileFile
 import com.ghostlock.app.domain.repository.GhostlockRepository
+import com.ghostlock.app.domain.usecase.AssessCve20210929UseCase
+import com.ghostlock.app.domain.usecase.ParseIonProbeOutputUseCase
 import com.ghostlock.app.domain.repository.ProfileConfigController
 import com.ghostlock.app.shizuku.ShizukuExploitRunner
 import kotlinx.coroutines.CancellationException
@@ -150,6 +153,7 @@ class AndroidGhostlockRepository(context: Context) : GhostlockRepository {
 
     override suspend fun snapshot(): KernelSnapshot {
         val release = System.getProperty("os.version", "unknown").orEmpty()
+        val ionProbe = probeIonDevice()
         /* PROFILE-SUGGEST-01: recommend_shizuku is a suggestion. It seeds the
          * toggle until the user makes an explicit choice, which then overrides
          * it in both directions. */
@@ -159,6 +163,10 @@ class AndroidGhostlockRepository(context: Context) : GhostlockRepository {
         return KernelSnapshot(
             deviceName = resolveDeviceName(),
             kernelRelease = release,
+            cve20210929Assessment = AssessCve20210929UseCase.assess(
+                securityPatchLevel = Build.VERSION.SECURITY_PATCH,
+                ionProbe = ionProbe,
+            ),
             socName = resolveSocName(),
             kernelSupported = isKernelSupported(),
             cpuPairs = cpuPairs.toList(),
@@ -171,6 +179,23 @@ class AndroidGhostlockRepository(context: Context) : GhostlockRepository {
             shizukuStatus = if (shizukuActive) shizukuRunner.status()
             else com.ghostlock.app.domain.model.ShizukuStatus.NOT_REQUIRED,
         )
+    }
+
+    /** Runs the no-allocation ION heap-count query in the app's own uid, without Shizuku or root. */
+    private suspend fun probeIonDevice(): IonDeviceProbe {
+        val binary = File(appContext.applicationInfo.nativeLibraryDir, "libghostlock.so")
+        if (!binary.isFile) return IonDeviceProbe()
+
+        val output = AtomicReference<String?>(null)
+        val exitCode = runProcess(
+            builder = ProcessBuilder(binary.absolutePath, "--probe-ion")
+                .directory(filesDir)
+                .redirectErrorStream(true),
+            onLog = { line -> if (line.startsWith("ION_PROBE\t")) output.set(line) },
+            timeoutSeconds = 5,
+        )
+        if (exitCode != 0) return IonDeviceProbe()
+        return ParseIonProbeOutputUseCase.parse(output.get()) ?: IonDeviceProbe()
     }
 
     override fun selectCpuPair(index: Int) {

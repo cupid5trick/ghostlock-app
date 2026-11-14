@@ -14,6 +14,8 @@ GhostLock 利用 CVE-2026-43499 在支持的 Android 内核上获取临时 root�
 
 如果启用了 Shizuku，请先通过 ADB 启动，再运行 GhostLock。点击 GhostLock 的状态卡授权。
 
+首页还会显示只读的 CVE-2021-0929 评估，依据 Android 报告的安全补丁级别，并依次探测 `/dev/ion` 节点、读取权限、只读打开以及 `ION_IOC_HEAP_QUERY` 堆数量查询。该 ioctl 不会分配 ION 缓冲区。补丁级别为 `2021-11-05` 或更新时显示“厂商报告已修复”；较早的补丁级别且检测到 ION 节点时显示“可能受影响”；信号缺失或不明确时显示“未知”。探测成功只表示接口响应了元数据查询，不能验证运行内核的代码、漏洞状态或厂商回移的补丁。
+
 任何自带 `libksud.so` 的 root 管理器都可提供 `ksud` 用于加载模块。内置列表（KernelSU、SukiSU Ultra、ReSukiSU、BakaSU、KowSU）会自动检测；其他管理器可在 **设置 → 根管理器** 中手动选择。缺 `ksud` 时 W1/W2 仍可拿到 uid 0，但不会加载模块。
 
 ## 添加内核 profile
@@ -27,6 +29,19 @@ GhostLock 利用 CVE-2026-43499 在支持的 Android 内核上获取临时 root�
 提取结果是尚未验证的候选 profile。App 会在执行前检查缺失或无效字段，生成成功不代表设备已获支持。验证和内置登记流程见[适配指南](docs/kernel_profiles/README_ZH.md)。
 
 联发科的镜像地址提取和已 root 设备补充取值流程见[联发科指南](docs/kernel_profiles/MEDIATEK_ZH.md)。
+
+## 构建 APK
+
+Pull request 会在不使用签名密钥的情况下构建 debug APK。在此 fork 的 `main` 分支推送或手动运行工作流时，会使用此 fork 的发布证书构建 release APK。本地构建时 source 被 Git 忽略的 `release-signing.env` 和 `release-signing.jks`：
+
+```sh
+set -a
+. ./release-signing.env
+set +a
+./gradlew :app:assembleRelease
+```
+
+不要提交这两个文件。此 fork 使用独立的签名证书，因此它的 APK 不能覆盖由上游项目证书签名的安装包。
 
 ## 命令行工具
 

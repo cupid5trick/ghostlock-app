@@ -75,7 +75,13 @@ jobs:
 
       - name: Decode Android signing key
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-        run: echo ${{ secrets.SIGNING_KEY }} | base64 -d > keystore.jks
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          test -n "$SIGNING_KEY"
+          printf '%s' "$SIGNING_KEY" | base64 --decode > "$RUNNER_TEMP/release-signing.jks"
+          test -s "$RUNNER_TEMP/release-signing.jks"
+          chmod 600 "$RUNNER_TEMP/release-signing.jks"
 
       - name: Build Ghostlock binary
         run: |
@@ -84,23 +90,43 @@ jobs:
           make -C src ghostlock
           "${{ runner.temp }}/ondk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-all build/native/ghostlock || true
 
-      - name: Build Release APK
+      - name: Run assessment unit tests
         run: |
-          export ONDK_HOME="${{ runner.temp }}/ondk"
-          export ANDROID_NDK_HOME="$ONDK_HOME"
-          export NDK_ROOT="$ONDK_HOME"
-          export KEYSTORE_PATH="../keystore.jks"
-          export KEYSTORE_PASS="${{ secrets.KEY_STORE_PASSWORD }}"
-          export KEY_ALIAS="${{ secrets.ALIAS }}"
-          export KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
-          ./gradlew :app:assembleRelease --no-daemon
+          ./gradlew --no-daemon :app:testDebugUnitTest \
+            --tests 'com.ghostlock.app.domain.usecase.AssessCve20210929UseCaseTest' \
+            --tests 'com.ghostlock.app.domain.usecase.ParseIonProbeOutputUseCaseTest'
+
+      - name: Build debug APK for PRs and non-main dispatches
+        if: ${{ github.ref != 'refs/heads/main' }}
+        env:
+          ONDK_HOME: ${{ runner.temp }}/ondk
+          ANDROID_NDK_HOME: ${{ runner.temp }}/ondk
+          NDK_ROOT: ${{ runner.temp }}/ondk
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Build signed release APK on main
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          ONDK_HOME: ${{ runner.temp }}/ondk
+          ANDROID_NDK_HOME: ${{ runner.temp }}/ondk
+          NDK_ROOT: ${{ runner.temp }}/ondk
+          KEYSTORE_PATH: ${{ runner.temp }}/release-signing.jks
+          KEYSTORE_PASS: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Strip Ghostlock binary
         run: |
           "${{ runner.temp }}/ondk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-all build/native/ghostlock || true
 
-      - name: Rename Release APK
+      - name: Rename release APK
+        if: ${{ github.ref == 'refs/heads/main' }}
         run: mv build/app/outputs/apk/release/*.apk GhostLock-release.apk
+
+      - name: Rename debug APK
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: mv build/app/outputs/apk/debug/*.apk GhostLock-debug.apk
 
       - name: Prepare extractor binaries
         run: |
@@ -125,10 +151,19 @@ jobs:
           unzip -l "$GITHUB_WORKSPACE/GhostLock-kernel-profiles.zip" | tail -5
 
       - name: Upload Release APK
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v7
         with:
           name: GhostLock-release
           path: GhostLock-release.apk
+          archive: false
+
+      - name: Upload Debug APK
+        if: ${{ github.ref != 'refs/heads/main' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: GhostLock-debug
+          path: GhostLock-debug.apk
           archive: false
 
       - name: Upload kernel profiles

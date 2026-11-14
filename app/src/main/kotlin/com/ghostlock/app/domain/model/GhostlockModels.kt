@@ -20,7 +20,37 @@ data class KernelSnapshot(
     /** User-selected Shizuku path for kernels that do not require it. */
     val shizukuEnabled: Boolean = false,
     val shizukuStatus: ShizukuStatus,
+    val cve20210929Assessment: Cve20210929Assessment,
 )
+
+/** Read-only indicators for CVE-2021-0929; this does not inspect kernel code. */
+data class Cve20210929Assessment(
+    val status: Cve20210929Status,
+    val securityPatchLevel: String?,
+    val ionProbe: IonDeviceProbe,
+)
+
+enum class Cve20210929Status {
+    VENDOR_REPORTED_PATCHED,
+    POTENTIALLY_AFFECTED,
+    UNKNOWN,
+}
+
+data class IonDeviceProbe(
+    val path: IonProbePathStatus = IonProbePathStatus.UNKNOWN,
+    val readPermission: IonProbePermissionStatus = IonProbePermissionStatus.NOT_TESTED,
+    val open: IonProbeOpenStatus = IonProbeOpenStatus.NOT_TESTED,
+    val heapQuery: IonProbeIoctlStatus = IonProbeIoctlStatus.NOT_TESTED,
+    val heapCount: Int? = null,
+)
+
+enum class IonProbePathStatus { PRESENT, ABSENT, UNKNOWN }
+
+enum class IonProbePermissionStatus { ALLOWED, DENIED, UNKNOWN, NOT_TESTED }
+
+enum class IonProbeOpenStatus { OPENED, DENIED, FAILED, NOT_TESTED }
+
+enum class IonProbeIoctlStatus { SUPPORTED, UNSUPPORTED, DENIED, FAILED, NOT_TESTED }
 
 enum class ShizukuStatus { NOT_REQUIRED, NOT_RUNNING, PERMISSION_REQUIRED, READY }
 
