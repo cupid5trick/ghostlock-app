@@ -102,7 +102,7 @@ $(NATIVE_BUILD_DIR)/%.o: %.cpp $(HDRS)
 	@mkdir -p $(dir $@)
 	$(NDK_CXX) $(CXXFLAGS) -c $< -o $@
 
-.PHONY: cpp-link-probe-test target-constants-test native-resource-test native-host-tests host-attack-dataflow-test lint-tidy
+.PHONY: cpp-link-probe-test target-constants-test native-resource-test native-host-tests host-attack-dataflow-test lint-tidy ion_backend_demo ion-kasan-regression
 cpp-link-probe-test: $(HOST_BUILD_DIR)/cpp_link_probe_test
 	$(HOST_BUILD_DIR)/cpp_link_probe_test
 
@@ -111,6 +111,11 @@ target-constants-test: $(HOST_BUILD_DIR)/target_constants_test
 
 native-resource-test: $(HOST_BUILD_DIR)/native_resource_test
 	$(HOST_BUILD_DIR)/native_resource_test
+
+ion_backend_demo: ion-kasan-regression
+
+ion-kasan-regression:
+	@../tools/ion-kasan-test/build-and-run.sh
 
 NATIVE_HOST_TESTS := \
   profile_test payload_builder_test heap_context_test route_status_test \
